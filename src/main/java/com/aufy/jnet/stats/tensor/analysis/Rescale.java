@@ -1,4 +1,4 @@
-package com.aufy.jnet.stats.tensor;
+package com.aufy.jnet.stats.tensor.analysis;
 
 import com.aufy.jnet.Tensor;
 import com.aufy.jnet.tensor.core.backend.compute.Generator;

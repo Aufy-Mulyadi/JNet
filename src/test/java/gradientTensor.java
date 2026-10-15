@@ -1,30 +1,29 @@
-import com.aufy.jnet.Tensor;
+import com.aufy.jnet.jtensor.Tensor;
 
 public class gradientTensor {
   public static void main(String[] args) {
-    Tensor A = new Tensor(new double[]{
-      1, 2,
-      3, 4
-    }, 2, 2).requiresGrad();
+    Tensor x = new Tensor(new double[] {
+      0f, 0f,
+      0f, 1f,
+      1f, 0f,
+      1f, 1f
+    }, 4, 2);
 
-    Tensor B = new Tensor(new double[]{
-      5, 6,
-      7, 8
-    }, 2, 2).requiresGrad();
+    // Tensor weight = new Tensor(new Gaussian(0, 1), 3, 2).requiresGrad();
+    Tensor weight = Tensor.init(3, 2).normal(0, 1).requiresGrad();
+    Tensor bias = Tensor.init(1, 3).zeros().requiresGrad();
 
-    Tensor C = Tensor.apply(
-      A,
-      B,
-      (a, b) -> {
-        return a.add(b);
-      },
-      (a, grad) -> {return grad.onesLike().mul(67);},
-      (b, grad) -> {return grad.onesLike();}
+    Tensor C = x.matmul(weight.transpose()).add(bias);
+    Tensor D = C.ops.elementwise(
+      a -> Math.max(a, a * 0.1f), 
+      a -> (a >= 0)? 1.0f : 0.1f
+    );
+    Tensor E = D.ops.elementwise(
+      a -> Math.max(a, a * 0.1f), 
+      a -> (a >= 0)? 1.0f : 0.1f
     );
 
-    C.backward();
-    // System.out.println(C);
-
-    System.out.println(A.grad());
+    E.backward();
+    System.out.println(weight.grad());
   }
 }

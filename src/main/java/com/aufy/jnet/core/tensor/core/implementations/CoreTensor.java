@@ -9,8 +9,8 @@ import java.util.Set;
 import java.util.function.Consumer;
 
 import com.aufy.jnet.core.backend.exceptions.internal.Data;
-import com.aufy.jnet.core.tensor.core.backend.util.ArrayTools;
-import com.aufy.jnet.core.tensor.graph.init.TensorCoreGenerator;
+import com.aufy.jnet.core.tensor.core.backend.util.Visual;
+import com.aufy.jnet.core.tensor.raw.init.RawTensorGenerator;
 
 public class CoreTensor {
   public static boolean verbose = false;
@@ -19,11 +19,12 @@ public class CoreTensor {
   public int rank;
   public int size;
   public int[] shape;
-  
   public boolean requiresGrad;
-  public CoreTensor grad; // stores d[end]/d[this]
-  public List<CoreTensor> parents = new ArrayList<>();
-  public Consumer<CoreTensor> derivative; // coretensor -> coretensor that gives the [grad] values to its parents
+  
+  public List<CoreTensor> cachedGraphOrder;
+  public List<CoreTensor> parents;
+  public RawTensor grad; // stores d[end]/d[this]
+  public Consumer<RawTensor> derivative; // rawtensor -> void that gives the [grad] values to its parents
   
   public CoreTensor(double[] data, int... shape) {
     this(new RawTensor(data, shape));
@@ -32,86 +33,14 @@ public class CoreTensor {
   public CoreTensor(RawTensor core) {
     this.core = core;
     this.requiresGrad = false;
-    this.shape = core.getShape();
-    this.size = core.getSize();
-    this.rank = core.getRank();
+    this.shape = core.shape;
+    this.size = core.size;
+    this.rank = core.rank;
   }
 
-  // ########################################################################################################### //
-  //                                              INITIALIZATION                                                 //
-  // ########################################################################################################### //
-  
-  /**
-   * Creates a tensor filled with ones.
-   * 
-   * @param shape the shape of the tensor.
-   * @return the tensor filled with ones.
-   */
-  public static CoreTensor ones(int... shape) {
-    return TensorCoreGenerator.ones(shape);
-  }
-
-  /**
-   * Creates a tensor filled with ones according to the shape of this tensor. This tensor will not be modified.
-   * 
-   * @return the tensor filled with ones.
-   */
-  public CoreTensor onesLike() {
-    return ones(this.shape);
-  }
-
-  /**
-   * Creates a tensor filled with ones according to the shape of another tensor.
-   * 
-   * @param tensor the tensor.
-   * @return the tensor filled with ones.
-   */
-  public static CoreTensor onesLike(CoreTensor tensor) {
-    return ones(tensor.shape);
-  }
-
-  /**
-   * Creates a tensor filled with ones.
-   * 
-   * @param shape the shape of the tensor.
-   * @return the tensor filled with ones.
-   */
-  public static CoreTensor zeros(int... shape) {
-    return TensorCoreGenerator.zeros(shape);
-  }
-
-  /**
-   * Creates a tensor filled with zeros according to the shape of this tensor. This tensor will not be modified.
-   * 
-   * @return the tensor filled with zeros.
-   */
-  public CoreTensor zerosLike() {
-    return zeros(this.shape);
-  }
-
-  /**
-   * Creates a tensor filled with zeros according to the shape of another tensor.
-   * 
-   * @param tensor the tensor.
-   * @return the tensor filled with zeros.
-   */
-  public static CoreTensor zerosLike(CoreTensor tensor) {
-    return zeros(tensor.shape);
-  }
-  
   // ########################################################################################################### //
   //                                                  UTILITY                                                    //
   // ########################################################################################################### //
-
-  public CoreTensor detach() {
-    return detach(this);
-  }
-
-  public static CoreTensor detach(CoreTensor tensor) {
-    CoreTensor out = new CoreTensor(tensor.core);
-    out.requiresGrad = false;
-    return out;
-  }
   
   public CoreTensor duplicate() {return duplicate(this);}
   public static CoreTensor duplicate(CoreTensor tensor) {
@@ -130,8 +59,8 @@ public class CoreTensor {
     return this.core.dump();
   }
 
-  public CoreTensor noGrad() {return noGrad(this);}
-  public static CoreTensor noGrad(CoreTensor tensor) {
+  public CoreTensor detach() {return detach(this);}
+  public static CoreTensor detach(CoreTensor tensor) {
     tensor.requiresGrad = false;
     tensor.parents = null;
     tensor.derivative = null;
@@ -145,24 +74,15 @@ public class CoreTensor {
 
   @Override
   public String toString() {
-    if (this.core.dump() == null || this.shape == null || this.core.dump().length == 0) return this.getClass().getSimpleName() + "[null]";
+    if (this.core.data == null || this.shape == null || this.core.data.length == 0) return "CoreTensor[null]()";
 
-    String prefix = this.getClass().getSimpleName() + Arrays.toString(this.shape) + "(\n";
-    String content = ArrayTools.print(this.core.dump(), this.shape, this.core.getStrides(), 0, 0, 2);
+    String prefix = "CoreTensor" + Arrays.toString(this.shape) + "(\n";
+    String content = Visual.print(this.core.data, this.shape, this.core.strides, 0, 0, 2);
 
     if (verbose) {
       return prefix + content + "\n\n" + " grad=" + this.requiresGrad + "\n" + " parents=" + this.parents.size() + "\n" + " derivative=" + this.derivative + "\n)";
     } else {
       return prefix + content + "\n)";
-    }
-  }
-
-  private void addInPlace(RawTensor other) {
-    Data.verifyEqualSizes("Data transfer", this.dump(), other.dump());
-    
-    // Perform raw array addition without creating a new result array
-    for (int i = 0; i < this.dump().length; i++) {
-      this.core.data[i] += other.data[i];
     }
   }
 
@@ -172,23 +92,25 @@ public class CoreTensor {
 
   public void zeroGrad() {CoreTensor.zeroGrad(this);}
   public static void zeroGrad(CoreTensor tensor) {
-    List<CoreTensor> nodes = buildGraph(tensor);
-    for (CoreTensor node : nodes) {
-      if (node.grad != null) {
-        java.util.Arrays.fill(node.grad.core.dump(), 0.0);
-      }
-    }
+    if (tensor.grad != null) Arrays.fill(tensor.grad.data, 0);
   }
 
-  public void accumulate(CoreTensor incomingGrad) {
+  public void accumulate(double[] incomingGrad) {
     if (!this.requiresGrad) return;
-    
-    if (this.grad == null) {
-      // initialize with zeros of the same shape as the data
-      this.grad = TensorCoreGenerator.zerosLike(this);
-    }
+    if (this.grad == null) this.grad = RawTensorGenerator.zerosLike(this.core);
 
-    this.grad.addInPlace(incomingGrad.core);
+    Data.verifyEqualSizes("Data transfer", this.core.data, incomingGrad);
+    
+    for (int i = 0; i < this.size; i++) this.grad.data[i] += incomingGrad[i];
+  }
+
+  public void accumulate(RawTensor incomingGrad) {
+    if (!this.requiresGrad) return;
+    if (this.grad == null) this.grad = RawTensorGenerator.zerosLike(this.core);
+
+    Data.verifyEqualSizes("Data transfer", this.core.data, incomingGrad.data);
+    
+    for (int i = 0; i < this.size; i++) this.grad.data[i] += incomingGrad.data[i];
   }
 
   public static List<CoreTensor> buildGraph(CoreTensor root) {
@@ -215,14 +137,16 @@ public class CoreTensor {
   }
 
   public void backward() {
-    this.grad = TensorCoreGenerator.onesLike(this);
+    this.grad = RawTensorGenerator.onesLike(this.core);
 
-    List<CoreTensor> order = buildGraph(this);
+    if (this.cachedGraphOrder == null) {
+      this.cachedGraphOrder = buildGraph(this);
+    }
 
-    for (CoreTensor node : order) {
-      if (node.derivative != null && node.grad != null) {
-        node.derivative.accept(node.grad);
-      }
+    for (int i = 0; i < this.cachedGraphOrder.size(); i++) {
+      CoreTensor node = this.cachedGraphOrder.get(i);
+
+      if (node.derivative != null && node.grad != null) node.derivative.accept(node.grad);
     }
   }
 

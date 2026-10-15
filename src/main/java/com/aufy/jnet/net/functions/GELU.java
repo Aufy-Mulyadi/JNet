@@ -1,13 +1,13 @@
 package com.aufy.jnet.net.functions;
 
-import com.aufy.jnet.Tensor;
+import com.aufy.jnet.jtensor.Tensor;
 import com.aufy.jnet.net.Module;
 
 public class GELU extends Module {
 
   @Override
   public Tensor forward(Tensor x) { // just an approximation
-    return x.elementwise(
+    return x.ops.elementwise(
       a -> {
         double c = Math.sqrt(2.0 / Math.PI);
         return 0.5 * a * (1.0 + Math.tanh(c * (a + 0.044715 * a * a * a)));

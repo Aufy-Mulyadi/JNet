@@ -1,7 +1,9 @@
 package com.aufy.jnet.core.backend.arrayops;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.ThreadLocalRandom;
 
 /**
  * Manages raw data processing for both integer and double arrays.
@@ -217,7 +219,7 @@ public class Tools {
    */
   public static int indexOf(double[] array, double value) {
     for (int i = 0; i < array.length; i++) {
-      if (array[i] == value) return i;
+      if (Math.abs(array[i] - value) < 0.0001) return i;
     }
     return -1;
   }
@@ -244,6 +246,18 @@ public class Tools {
    */
   public static int[] arrange(int size) {
     int[] result = new int[size];
+    for (int i = 0; i < size; i++) result[i] = i;
+    return result;
+  }
+
+  /**
+   * Arranges an array from 0 to 'size - 1' with ints of increasing order.
+   *
+   * @param size size of the array
+   * @return array containing doubles from 1 to 'size'
+   */
+  public static double[] arrangeDouble(int size) {
+    double[] result = new double[size];
     for (int i = 0; i < size; i++) result[i] = i;
     return result;
   }
@@ -323,23 +337,73 @@ public class Tools {
   }
 
   /**
-   * Replaces all instances of a value in an array with a replacement.
+   * Insert integer values in an array. Pushes subsequent values to the right.
+   * 
+   * @param data the array to insert a value.
+   * @param values the values to insert in the indecies.
+   * @param indecies the locations.
+   * @return the array with an inserted value.
+   */
+  public static int[] scatter(int[] data, int[] indecies, int[] values) {    
+    int[] result = new int[data.length + values.length];
+    int newValueTracker = 0;
+    int oldValueTracker = 0;
+
+    for (int i = 0; i < result.length; i++) {
+      if (!contains(indecies, i)) result[i] = data[oldValueTracker++];
+      else result[i] = values[newValueTracker++];
+    }
+    
+    return result;
+  }
+
+  /**
+   * Replaces all instances of an integer value in an array with a replacement.
    * 
    * @param data the array to replace values in.
    * @param value the value to search for.
    * @param replacement the value to replace with.
    * @return the array with replaced values.
    */
-  public static double[] replace(double[] data, double value, double replacement) {    
-    boolean findNaN = Double.isNaN(value);
-    double[] result = new double[data.length];
+  public static int[] replace(int[] data, int value, int replacement) {    
+    int[] result = new int[data.length];
     
-    for (int i = 0; i < data.length; i++) {
-      boolean match = findNaN ? Double.isNaN(data[i]) : Double.compare(data[i], value) == 0;
-      
-      result[i] = match ? replacement : data[i];
-    }
+    for (int i = 0; i < data.length; i++) result[i] = (data[i] == value) ? replacement : data[i];
     
     return result;
   }
+
+  /**
+   * Fisher-Yates implementation of a shuffler. This implementation goes from the last index to the first index while swapping elements.
+   * 
+   * @param array array to shuffle.
+   * @return a new array that is shuffled.
+   */
+  public static int[] shuffle(int[] array) {
+    int[] answer = array.clone();
+
+    for (int i = array.length - 1; i > 0; i--) {
+      int index = ThreadLocalRandom.current().nextInt(i + 1);
+      
+      // Simple swap
+      int temp = answer[index];
+      answer[index] = answer[i];
+      answer[i] = temp;
+    }
+
+    return answer;
+  }
+
+  /**
+   * Returns an array of ones with the same length as the input array.
+   * 
+   * @param array the input array.
+   * @return an array of ones with the same length as the input array.
+   */
+  public static double[] onesLike(double[] array) {
+    double[] result = new double[array.length];
+    Arrays.fill(result, 1);
+    return result;
+  }
+
 }

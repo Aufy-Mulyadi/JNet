@@ -1,7 +1,6 @@
 package com.aufy.jnet.core.tensor.core.backend.compute;
 
-import java.util.Arrays;
-import java.util.function.BiFunction;
+import java.util.function.Function;
 
 import com.aufy.jnet.core.backend.arrayops.Reductions;
 
@@ -31,9 +30,8 @@ public class Engine {
    * @param targetShape the shape of the target tensor.
    * @return the broadcasted data.
    */
-  public static double[] broadcast(double[] data, int[] originalShape, int[] targetShape) {
+  public static double[] broadcast(double[] data, int[] dataStrides, int[] originalShape, int[] targetShape) {
     int targetSize = Reductions.prod(targetShape);
-    int[] dataStrides = Memory.calculateStrides(originalShape);
     int[] targetStrides = Memory.calculateStrides(targetShape);
     
     double[] out = new double[targetSize]; // output data
@@ -86,47 +84,19 @@ public class Engine {
     // speed thigs up by precomputing the offsets
     int[] OffsetA = Shaping.findOffset(subShape, axesA, stridesA);
     int[] OffsetB = Shaping.findOffset(subShape, axesB, stridesB);
-    
+
     int[] resCoords = new int[resShape.length];
     int resIdx = 0;
 
-    // make sure this thing runs at all cost
-    // thankfully the flawed while-loop was fixed: contraction was so wrong before
-    // should've probably read more closely before messing around in Engine
+    int[] emptyA = new int[axesA.length];
+    int[] emptyB = new int[axesB.length];
+
     do {
-      int baseOffsetA = Memory.mapToOffset(resCoords, new int[axesA.length], axesA, shapeA, stridesA, true);
-      int baseOffsetB = Memory.mapToOffset(resCoords, new int[axesB.length], axesB, shapeB, stridesB, false);
-      
+      int baseOffsetA = Memory.mapToOffset(resCoords, emptyA, axesA, shapeA, stridesA, true);
+      int baseOffsetB = Memory.mapToOffset(resCoords, emptyB, axesB, shapeB, stridesB, false);
+
       double sum = 0;
-      
-      for (int k = 0; k < contractVolume; k++) {
-
-        // check since the output is wrong on the first go
-        if ((baseOffsetA + OffsetA[k]) >= dataA.length || (baseOffsetB + OffsetB[k]) >= dataB.length) {
-          System.out.println("shapeB   = " + Arrays.toString(shapeB));
-          System.out.println("stridesB = " + Arrays.toString(stridesB));
-          System.out.println("resCoords= " + Arrays.toString(resCoords));
-          System.out.println("baseOffsetB = " + baseOffsetB);
-
-          System.out.println("=============================================================");
-
-          System.out.println("idxA = " + (baseOffsetA + OffsetA[k]) + " / " + dataA.length);
-          System.out.println("idxB = " + (baseOffsetB + OffsetB[k]) + " / " + dataB.length);
-
-          System.out.println("baseOffsetA = " + baseOffsetA);
-          System.out.println("baseOffsetB = " + baseOffsetB);
-
-          System.out.println("OffsetA[k] = " + OffsetA[k]);
-          System.out.println("OffsetB[k] = " + OffsetB[k]);
-
-          System.out.println("k = " + k);
-
-          System.out.println(Arrays.toString(resCoords));
-          throw new RuntimeException();
-        }
-
-        sum += dataA[baseOffsetA + OffsetA[k]] * dataB[baseOffsetB + OffsetB[k]];
-      }
+      for (int k = 0; k < contractVolume; k++) sum += dataA[baseOffsetA + OffsetA[k]] * dataB[baseOffsetB + OffsetB[k]];
       
       resData[resIdx] = sum;
       resIdx++;
@@ -138,38 +108,92 @@ public class Engine {
   }
 
   /**
-   * Sums elements of an original tensor to a smaller target tensor. This is like a reverse of the broadcast function. must use a bifunction
-   * to provide an accumilator function to parse the series of elements in one slice.
+   * Applies a reduction to select axes of an array.
    * 
-   * @param data the data to sum.
-   * @param originalShape the shape of the original tensor.
-   * @param targetShape the shape of the target tensor, must have the same rank as the original shape but must have smaller in size.
-   * @param operator the operator to apply to each element.
-   * @return the reduced data.
-   *
+   * @param data an array of double values
+   * @param shape the shape of the array
+   * @param strides the strides of the array
+   * @param axes the axes to reduce
+   * @param operation a reduction operation to apply to the reduced subspace, can either be a lambda expression or a reference to a method
+   * @param keepDims whether to keep the dimensions that are reduced (squeeze or no)
+   * @return a new array containing the results of applying the operation to the data
    */
-  public static double[] reduction(double[] data, int[] originalShape, int[] targetShape, BiFunction<Double, Double, Double> operator) {
-    double[] reduced = new double[Reductions.prod(targetShape)];
-    int[] gradStrides = Memory.calculateStrides(originalShape);
-    int[] origStrides = Memory.calculateStrides(targetShape);
+  public static double[] reduce(double[] data, int[] shape, int[] strides, int[] axes, Function<double[], Double> operation) {
+    int[] resShape = Shaping.reduceAxes(shape, axes);
+    double[] resData = new double[Reductions.prod(resShape)];
+    
+    int[] subShape = Shaping.reorder(shape, axes); // size of one slice
+    int reductionVolume = Reductions.prod(subShape);
+    
+    int[] resCoords = new int[resShape.length];
+    int resIdx = 0;
+    
+    double[] subShapeData = new double[Reductions.prod(subShape)];
 
-    for (int i = 0; i < data.length; i++) { // map over all grad data and map grads by reducing to the new shape
-      int remaining = i;
-      int originalIndex = 0;
-
-      // same like broadcasting but its the reverse: its basically ReductionOps::sum/CoreReductionOps::sum but for 
-      // the heap itself instead of calling backend.func.Reduction
-      for (int dim = 0; dim < originalShape.length; dim++) {
-        int coord = (remaining / gradStrides[dim]) % originalShape[dim];
+    do {
+      for (int k = 0; k < reductionVolume; k++) { // fills up the resulting spot by looping over the slice
         
-        // if its the dimension with a size of 1, dont move the copyer the index
-        if (targetShape[dim] != 1) {
-          originalIndex += coord * origStrides[dim];
-        }
+        // map coords to offset coors suitable for the 1d data
+        int offset = Memory.mapToOffset(
+          resCoords, 
+          Memory.unravel(k, subShape), // get the sliced indices of the kth element
+          axes, 
+          shape, 
+          strides, 
+          true
+        );
+
+        subShapeData[k] = data[offset];
       }
-      reduced[originalIndex] = operator.apply(reduced[originalIndex], data[i]);
-    }
-    return reduced;
+
+      double ans = operation.apply(subShapeData);
+
+      resData[resIdx++] = ans;
+    } while (Memory.nextCoordinate(resCoords, resShape));
+
+    return resData;
+  }
+
+  /**
+   * Applies a subtensor mapping to select axes of an array.
+   * 
+   * @param data an array of double values
+   * @param shape the shape of the array
+   * @param strides the strides of the array
+   * @param axes the axes to analyse
+   * @param operation a subtensor operation to apply to the subspaces, can either be a lambda expression or a reference to a method
+   * @param keepDims whether to keep the dimensions that are reduced (squeeze or no)
+   * @return a new array containing the results of applying the operation to the data
+   */
+  public static double[] slicedMap(double[] data, int[] shape, int[] strides, int[] axes, Function<double[], double[]> operation) {
+    double[] resData = new double[data.length];
+    
+    int[] subShape = Shaping.reorder(shape, axes); // size of one slice
+    int processingVolume = Reductions.prod(subShape);
+    
+    int[] resCoords = new int[shape.length];
+    double[] subShapeData = new double[Reductions.prod(subShape)];
+    int[] indecies = new int[processingVolume];
+
+    do {
+      // gather
+      for (int k = 0; k < processingVolume; k++) { // fills up the resulting spot by looping over the slice
+        int[] kCoords = Memory.unravel(k, subShape); // get the sliced indices of the kth element
+
+        // map coords to offset coords suitable for the 1d data
+        int offset = Memory.mapToOffset(resCoords, kCoords, axes, shape, strides, true);
+        subShapeData[k] = data[offset];
+        indecies[k] = offset;
+      }
+
+      double[] ans = operation.apply(subShapeData);
+
+      // scatter
+      for (int k = 0; k < processingVolume; k++) resData[indecies[k]] = ans[k];
+
+    } while (Memory.nextCoordinate(resCoords, shape));
+
+    return resData;
   }
 
   /**
@@ -185,23 +209,23 @@ public class Engine {
   public static double[] concat(int axis, int[][] shapes, double[][] dataList, int[] resultShape) {
     double[] out = new double[Reductions.prod(resultShape)];
     int totalAxisDim = resultShape[axis];
-    int outerCount = 1;
-    int innerSize = 1;
+    int leadingCount = 1;
+    int trailingCount = 1;
 
-    for (int i = 0; i < axis; i++) outerCount *= resultShape[i];
-    for (int i = axis + 1; i < resultShape.length; i++) innerSize *= resultShape[i];
+    for (int i = 0; i < axis; i++) leadingCount *= resultShape[i];
+    for (int i = axis + 1; i < resultShape.length; i++) trailingCount *= resultShape[i];
 
     int currentAxisOffset = 0;
     for (int i = 0; i < dataList.length; i++) {
       double[] originalData = dataList[i];
       int originalAxisDimension = shapes[i][axis];
 
-      for (int j = 0; j < outerCount; j++) {
+      for (int j = 0; j < leadingCount; j++) {
         // jump over outer blocks, then jump to the current tensor's start in the axis
-        int finalPosition = (j * totalAxisDim * innerSize) + (currentAxisOffset * innerSize);
-        int originalPosition = j * originalAxisDimension * innerSize;
+        int finalPosition = (j * totalAxisDim * trailingCount) + (currentAxisOffset * trailingCount);
+        int originalPosition = j * originalAxisDimension * trailingCount;
 
-        System.arraycopy(originalData, originalPosition, out, finalPosition, originalAxisDimension * innerSize);
+        System.arraycopy(originalData, originalPosition, out, finalPosition, originalAxisDimension * trailingCount);
       }
       currentAxisOffset += originalAxisDimension;
     }
@@ -219,28 +243,9 @@ public class Engine {
    * @return the data of the resulting tensor.
    */
   public static double[] stack(int axis, double[][] dataList, int[][] originalShapes, int[] resultShape) {
-    // if axis is 0, keep the sequential copy
-    if (axis == 0) {
-      double[] out = new double[Reductions.prod(resultShape)];
-      int tensorSize = out.length / dataList.length;
-      for (int i = 0; i < dataList.length; i++) {
-        System.arraycopy(dataList[i], 0, out, i * tensorSize, tensorSize);
-      }
-      return out;
-    }
-
     // if axis > 0, unsqueeze shapes by inserting a 1 at [axis]
     int[][] unsqueezedShapes = new int[originalShapes.length][];
-
-    for (int i = 0; i < originalShapes.length; i++) {
-      int[] newShape = new int[unsqueezedShapes[i].length + 1];
-
-      System.arraycopy(unsqueezedShapes[i], 0, newShape, 0, axis); // copy original shape up until axis
-      newShape[axis] = 1; // 1 at axis
-      System.arraycopy(unsqueezedShapes[i], axis, newShape, axis + 1, unsqueezedShapes[i].length - axis); // everything else after the axis
-
-      unsqueezedShapes[i] = newShape; // this new shape is now replaced
-    }
+    for (int i = 0; i < originalShapes.length; i++) unsqueezedShapes[i] = Shaping.unsqueeze(originalShapes[i], new int[]{axis}); // this new shape is now replaced
 
     // delegate to concat
     return concat(axis, unsqueezedShapes, dataList, resultShape);
@@ -361,5 +366,5 @@ public class Engine {
     
     return out;
   }
-
+  
 }

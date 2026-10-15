@@ -1,24 +1,45 @@
 package com.aufy.jnet.net.losses;
 
-import com.aufy.jnet.Tensor;
+import com.aufy.jnet.jtensor.Custom;
+import com.aufy.jnet.jtensor.Tensor;
+import com.aufy.jnet.net.functional.Extra;
 
 public class CategoricalCrossEntropy extends Loss{
+  private final boolean logits;
+
+  public CategoricalCrossEntropy(boolean logits) {
+    this.logits = logits;
+  }
+
   @Override
   public Tensor compute(Tensor prediction, Tensor target) {
-    return Tensor.apply(prediction, target,
+    return Custom.apply(prediction, target,
       (p, t) -> {
-        var softmax = p.exp().div(p.exp().sum(1)).clip(0.0001, 0.9999);
-        var loss = softmax.ln().mul(-1.0).hadamard(t);
-        var averaged = loss.sum(0,1).mul(1.0/p.getShape()[0]);
+        Tensor logsoftmax;
 
-        return softmax;
+        if (logits) {
+          logsoftmax = Extra.logSoftmax(p, 1);
+        } else {
+          logsoftmax = p.ln();
+        }
+
+        Tensor loss = logsoftmax.mul(-1.0).hadamard(t);
+
+        return loss.stats(0,1).mean();
       },
 
       (p, t) -> {
-        var softmax = p.exp().div(p.exp().sum(1)).clip(0.0001, 0.9999);
-        return softmax.sub(t).mul(1.0/p.getShape()[0]);
+        Tensor softmax;
+
+        if (logits) {
+          softmax = Extra.softmax(p, 1);
+        } else {
+          softmax = p;
+        }
+
+        return softmax.sub(t);
       },
-      (p, t) -> p.zerosLike() // target wont need gradients
+      (p, t) -> p.init().ones() // target wont need gradients
     );
   }
 }

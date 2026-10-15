@@ -12,10 +12,11 @@ public class Argument {
    * 
    * @param cutoff the cutoff to compare if data is above or not.
    * @param data the scalar to check.
-   * @throws IllegalArgumentException
+   * @param operation the name of the calling operation.
+   * 
    */
-  public static void aboveValue(double cutoff, double data, String operation) throws IllegalArgumentException {
-    if (data < cutoff) throw new IllegalArgumentException(Message.crash("tensor argument", "Illegal parameter", operation , "parameter must be at least " + cutoff + " but got " + data));
+  public static void aboveValue(double cutoff, double data, String operation) {
+    if (data < cutoff) Message.crash("tensor argument", "Illegal parameter", operation , "parameter must be at least " + cutoff + " but got " + data);
   }
 
   /**
@@ -23,10 +24,11 @@ public class Argument {
    * 
    * @param cutoff the cutoff to compare if data is below or not.
    * @param data the scalar to check.
-   * @throws IllegalArgumentException
+   * @param operation the name of the calling operation.
+   * 
    */
-  public static void belowValue(double cutoff, double data, String operation) throws IllegalArgumentException {
-    if (data > cutoff) throw new IllegalArgumentException(Message.crash("tensor argument", "Illegal parameter", operation , "parameter cannot exceed " + cutoff + " but got " + data));
+  public static void belowValue(double cutoff, double data, String operation) {
+    if (data > cutoff) Message.crash("tensor argument", "Illegal parameter", operation , "parameter cannot exceed " + cutoff + " but got " + data);
   }
 
   /**
@@ -35,9 +37,10 @@ public class Argument {
    * @param lower the lower inclusive bound.
    * @param upper the upper inclusive bound.
    * @param data the scalar to check.
-   * @throws IllegalArgumentException
+   * @param operation the name of the calling operation.
+   * 
    */
-  public static void betweenValue(double lower, double upper, double data, String operation) throws IllegalArgumentException {
-    if (data > upper || data < lower) throw new IllegalArgumentException(Message.crash("tensor argument", "Illegal parameter", operation , "parameter must be between " + lower + " and " + upper + " but got " + data));
+  public static void betweenValue(double lower, double upper, double data, String operation) {
+    if (data > upper || data < lower) Message.crash("tensor argument", "Illegal parameter", operation , "parameter must be between " + lower + " and " + upper + " but got " + data);
   }
 }

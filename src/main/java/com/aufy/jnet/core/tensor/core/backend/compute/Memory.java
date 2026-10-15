@@ -1,7 +1,6 @@
 package com.aufy.jnet.core.tensor.core.backend.compute;
 
 import com.aufy.jnet.core.backend.arrayops.Reductions;
-import com.aufy.jnet.core.backend.arrayops.Tools;
 
 /**
  * Main class for handling memory and index logic. This is different from shaping (which also handle memory and stride logic) in the sense
@@ -59,23 +58,8 @@ public class Memory {
   }
 
   /**
-   * Calculates the raw memory address based on the strides and the coordinates in the tensor.
-   *
-   * @param strides The array of strides.
-   * @param coords The specific location in a tensor.
-   * @return The calculated raw index.
-   */
-  public static int getOffset(int[] strides, int[] coords) {
-    int offset = 0;
-    for (int i = 0; i < coords.length; i++) {
-      offset += coords[i] * strides[i];
-    }
-    return offset;
-  }
-
-  /**
    * It starts at the rightmost dimension and adds 1 until it overflows and resets that dimension to 0, carrying the addition over to the left dimension. 
-   * It returns true as long is more to visit and false when the is no more to visit.
+   * It returns true as long as there is more to visit and false when the is no more to visit.
    *
    * @param coords The location of a spot.
    * @param shape The shape of the tensor.
@@ -91,32 +75,36 @@ public class Memory {
 
   /**
    * Calculates the raw memory address based on the strides and the coordinates in the tensor after reducing it along axes and coordinates in the
-   * extracted subspace. Its essentially converting indices from the full tensor to the reduced tensor based on specifications axes.
+   * extracted subspace. Its essentially converting subspace coordinates into the full tensor coordinates and then taking the raw memory location
+   * of that full tensor coordinate.
    * 
    * @param resCoords The coordinates in the reduced tensor.
-   * @param kCoords The coordinates in an extracted subspace of the original tensor.
+   * @param subspaceCoords The coordinates in an extracted subspace of the original tensor.
    * @param axes The specific dimension indices that are being collapsed or calculated over.
    * @param fullShape The complete, original shape of the input tensor before any reduction happened.
    * @param strides The memory strides of that original shape
-   * @param isA A positional flag. For multi-tensor operations (like C = A @ B), the surviving coordinates might line up with the front or the back of the shape. isA controls whether to read resCoords from the beginning (0) or offset from the end
+   * @param FrontAlignedIndexing A positional flag. For multi-tensor operations (like C = A @ B), the surviving coordinates might line up with the front or the back of the shape. frontAlignedIndexing controls whether to read resCoords from the beginning (0) or offset from the end
    * @return The resulting raw memory address in this new tensor.
    */
-  public static int mapToOffset(int[] resCoords, int[] kCoords, int[] axes, int[] fullShape, int[] strides, boolean isA) {
-    int[] fullCoords = new int[fullShape.length];
+  public static int mapToOffset(int[] resCoords, int[] subspaceCoords, int[] axes, int[] fullShape, int[] strides, boolean frontAlignedIndexing) {
+    boolean[] isAxis = new boolean[fullShape.length];
+
+    // mark which axes are of interest
+    for (int axis : axes) isAxis[axis] = true;
     
-    for (int i = 0; i < axes.length; i++) { // puts the kcoord (wherever it may be) in the location relative to the original shape
-      fullCoords[axes[i]] = kCoords[i];
-    }
-
-    int resPtr = isA ? 0 : (resCoords.length - (fullShape.length - axes.length));
-
-    for (int i = 0; i < fullShape.length; i++) { // fills the remaining coordinates with resCoords. if theres already a spot filled then it moves
-      if (!Tools.contains(axes, i)) { // only put stuff in if its not in axes of reduction
-        fullCoords[i] = resCoords[resPtr++];
+    int offset = 0;
+    int resPtr = frontAlignedIndexing ? 0 : (resCoords.length - (fullShape.length - axes.length));
+    int subPtr = 0;
+    
+    for (int i = 0; i < fullShape.length; i++) {
+      if (isAxis[i]) { // if the dimensuon is of interest, use subspace coords
+        offset += subspaceCoords[subPtr++] * strides[i];
+      } else { // else if its anything else, use the normal coordinates
+        offset += resCoords[resPtr++] * strides[i];
       }
     }
     
-    return getOffset(strides, fullCoords); // find the location of the strides if it is on the full shape
+    return offset;
   }
 
 }

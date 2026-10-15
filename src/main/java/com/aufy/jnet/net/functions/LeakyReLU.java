@@ -1,6 +1,6 @@
 package com.aufy.jnet.net.functions;
 
-import com.aufy.jnet.Tensor;
+import com.aufy.jnet.jtensor.Tensor;
 import com.aufy.jnet.net.Module;
 
 public class LeakyReLU extends Module {
@@ -16,9 +16,9 @@ public class LeakyReLU extends Module {
 
   @Override
   public Tensor forward(Tensor x) {
-    return x.elementwise(
-      a -> Math.max(a, alpha), 
-      a -> (a > 0)? 1.0 : alpha
+    return x.ops.elementwise(
+      a -> Math.max(a, a * alpha), 
+      a -> (a >= 0)? 1.0 : alpha
     );
   }
 }

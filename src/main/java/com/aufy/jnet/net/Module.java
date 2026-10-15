@@ -3,10 +3,10 @@ package com.aufy.jnet.net;
 import java.util.Collections;
 import java.util.List;
 
-import com.aufy.jnet.Tensor;
+import com.aufy.jnet.jtensor.Tensor;
 
 /**
- * Base class for all modules (Layers, Activation functions, even Optimizers).
+ * Base class for all modules (Layers & Activation functions).
  */
 public abstract class Module {
   
@@ -23,7 +23,7 @@ public abstract class Module {
    * 
    * @return trainable parameters.
    */
-  public List<Parameter> parameters() {
+  public List<Tensor> parameters() {
     return Collections.emptyList();
   }
 

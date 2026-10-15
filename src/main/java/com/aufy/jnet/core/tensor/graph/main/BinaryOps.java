@@ -1,56 +1,23 @@
 package com.aufy.jnet.core.tensor.graph.main;
 
+import java.util.Arrays;
 import java.util.List;
-import java.util.function.BiFunction;
 
+import com.aufy.jnet.core.backend.arrayops.Reductions;
 import com.aufy.jnet.core.backend.arrayops.Tools;
 import com.aufy.jnet.core.backend.arrayops.Uniform;
-import com.aufy.jnet.core.backend.interfaces.BinaryOp;
-import com.aufy.jnet.core.tensor.core.backend.compute.Engine;
+import com.aufy.jnet.core.backend.interfaces.atomic.BinaryOp;
 import com.aufy.jnet.core.tensor.core.backend.compute.Shaping;
 import com.aufy.jnet.core.tensor.core.implementations.CoreTensor;
 import com.aufy.jnet.core.tensor.core.implementations.RawTensor;
-import com.aufy.jnet.core.tensor.functional.main.RawBinaryOps;
-import com.aufy.jnet.core.tensor.functional.main.RawShapeOps;
+import com.aufy.jnet.core.tensor.raw.main.RawBinaryOps;
+import com.aufy.jnet.core.tensor.raw.main.RawShapeOps;
+import com.aufy.jnet.core.tensor.raw.main.RawSubtensorOps;
 
 public class BinaryOps {
-  /*
-  dont go overboard with the additions, Tensor will do the job. just add the core stuff and Tensor will do the rest
-  */
-
-  public static CoreTensor apply(CoreTensor tensorA, CoreTensor tensorB, BiFunction<RawTensor, RawTensor, RawTensor> operation, BiFunction<RawTensor, RawTensor, RawTensor> dA, BiFunction<RawTensor, RawTensor, RawTensor> dB) {    
-    CoreTensor out = new CoreTensor(operation.apply(tensorA.core, tensorB.core));
-    
-    out.requiresGrad = tensorA.requiresGrad || tensorB.requiresGrad;
-    
-    if (out.requiresGrad) {
-      out.parents = List.of(tensorA, tensorB);
-      
-      out.derivative = (grad) -> {
-        if (tensorA.requiresGrad) {
-          RawTensor dACore = dA.apply(tensorA.core, tensorB.core);
-          RawTensor gradA = RawBinaryOps.elementwise(grad.core, dACore, (x, y) -> x * y);
-          tensorA.accumulate(new CoreTensor(gradA));
-        }
-        
-        if (tensorB.requiresGrad) {
-          RawTensor dBCore = dB.apply(tensorA.core, tensorB.core);
-          RawTensor gradB = RawBinaryOps.elementwise(grad.core, dBCore, (x, y) -> x * y);
-          tensorB.accumulate(new CoreTensor(gradB));
-        }
-      };
-    }
-    
-    return out;
-  }
   
   public static CoreTensor elementwise(CoreTensor tensorA, CoreTensor tensorB, BinaryOp operation, BinaryOp dA, BinaryOp dB) {
-    int[] broadcastShapeTarget = Shaping.broadcastedShape(tensorA.shape, tensorB.shape);
-    
-    RawTensor coreA = RawShapeOps.broadcast(tensorA.core, broadcastShapeTarget);
-    RawTensor coreB = RawShapeOps.broadcast(tensorB.core, broadcastShapeTarget);
-    
-    CoreTensor out = new CoreTensor(RawBinaryOps.elementwise(coreA, coreB, operation));
+    CoreTensor out = new CoreTensor(RawBinaryOps.elementwise(tensorA.core, tensorB.core, operation));
     
     out.requiresGrad = tensorA.requiresGrad || tensorB.requiresGrad;
     
@@ -59,19 +26,28 @@ public class BinaryOps {
       
       out.derivative = (grad) -> {
         if (tensorA.requiresGrad) {
-          RawTensor dACore = RawBinaryOps.elementwise(coreA, coreB, dA); // dy/dx
-          RawTensor gradA  = RawBinaryOps.elementwise(grad.core, dACore, (x, y) -> x * y); // grad * dy/dx = grad/dx
+          RawTensor dACore = RawBinaryOps.elementwise(tensorA.core, tensorB.core, dA); // dy/dx
+          double[] gradA = BinaryOp.apply(grad.data, dACore.data, (x, y) -> x * y); // grad * dy/dx = grad/dx
+
+          if (!Arrays.equals(tensorA.shape, tensorB.shape)) {
+            RawTensor reducedData = RawSubtensorOps.reduce(new RawTensor(gradA, dACore.shape), Reductions::sum, (Shaping.broadcastedAxes(tensorA.shape, tensorB.shape)));
+            tensorA.accumulate(reducedData);
+          } else {
+            tensorA.accumulate(gradA);
+          }
           
-          double[] reducedData = Engine.reduction(gradA.dump(), broadcastShapeTarget, tensorA.shape, (a,b) -> a + b); // reshape data if there was broadcasting
-          tensorA.accumulate(new CoreTensor(reducedData, tensorA.shape));
         }
         
         if (tensorB.requiresGrad) {
-          RawTensor dBCore = RawBinaryOps.elementwise(coreA, coreB, dB);
-          RawTensor gradB  = RawBinaryOps.elementwise(grad.core, dBCore, (x, y) -> x * y);
-          
-          double[] reducedData = Engine.reduction(gradB.dump(), broadcastShapeTarget, tensorB.shape, (a,b) -> a + b);
-          tensorB.accumulate(new CoreTensor(reducedData, tensorB.shape));
+          RawTensor dBCore = RawBinaryOps.elementwise(tensorA.core, tensorB.core, dB);
+          double[] gradB = BinaryOp.apply(grad.data, dBCore.data, (x, y) -> x * y);
+
+          if (!Arrays.equals(tensorA.shape, tensorB.shape)) {
+            RawTensor reducedData = RawSubtensorOps.reduce(new RawTensor(gradB, dBCore.shape), Reductions::sum, (Shaping.broadcastedAxes(tensorB.shape, tensorA.shape)));
+            tensorB.accumulate(reducedData);
+          } else {
+            tensorB.accumulate(gradB);
+          }
         }
       };
     }
@@ -89,40 +65,42 @@ public class BinaryOps {
       int[] freeA = Shaping.removeAxes(Tools.arrange(tensorA.rank), axesA);
       int[] freeB = Shaping.removeAxes(Tools.arrange(tensorB.rank), axesB);
 
-      int[] freeA_inC = Tools.arrange(freeA.length); 
-      int[] freeB_inC = Uniform.add(Tools.arrange(freeB.length), freeA.length);
-
       out.derivative = (grad) -> {
         if (tensorA.requiresGrad) {
-          RawTensor gradACore = RawBinaryOps.contract(tensorB.core, grad.core, freeB, freeB_inC);
+          RawTensor gradACore = RawBinaryOps.contract(
+            grad, 
+            tensorB.core,
+            Uniform.add(Tools.arrange(freeB.length), freeA.length),
+            freeB
+          );
 
-          int[] rawAxes = Tools.concat(axesA, freeA);
           int[] permuteOrder = new int[tensorA.rank];
 
-          for (int i = 0; i < rawAxes.length; i++) {
-            permuteOrder[rawAxes[i]] = i;
+          for (int i = 0; i < tensorA.rank; i++) {
+            permuteOrder[Tools.concat(freeA, axesA)[i]] = i;
           }
 
-          tensorA.accumulate(ShapeOps.permute(new CoreTensor(gradACore), permuteOrder));
+          tensorA.accumulate(RawShapeOps.permute(gradACore, permuteOrder));
         }
         if (tensorB.requiresGrad) {
-          RawTensor gradBCore = RawBinaryOps.contract(grad.core, tensorA.core, freeA_inC, freeA);
-          int[] rawAxes = Tools.concat(freeB, axesB);
+          RawTensor gradBCore = RawBinaryOps.contract(
+            tensorA.core, 
+            grad, 
+            freeA,
+            Tools.arrange(freeA.length)
+          );
+
           int[] permuteOrder = new int[tensorB.rank];
 
-          for (int i = 0; i < rawAxes.length; i++) {
-            permuteOrder[rawAxes[i]] = i;
+          for (int i = 0; i < tensorB.rank; i++) {
+            permuteOrder[Tools.concat(axesB, freeB)[i]] = i;
           }
 
-          tensorB.accumulate(ShapeOps.permute(new CoreTensor(gradBCore), permuteOrder));
+          tensorB.accumulate(RawShapeOps.permute(gradBCore, permuteOrder));
         }
       };
     }
     
     return out;
-  }
-
-  public static CoreTensor add(CoreTensor tensorA, CoreTensor tensorB) {
-    return elementwise(tensorA, tensorB, (x, y) -> x + y, (x, y) -> 1.0, (x, y) -> 1.0);
   }
 }

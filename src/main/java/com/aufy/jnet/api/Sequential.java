@@ -3,9 +3,8 @@ package com.aufy.jnet.api;
 import java.util.ArrayList;
 import java.util.List;
 
-import com.aufy.jnet.Tensor;
+import com.aufy.jnet.jtensor.Tensor;
 import com.aufy.jnet.net.Module;
-import com.aufy.jnet.net.Parameter;
 
 public class Sequential extends Module {
 
@@ -25,8 +24,8 @@ public class Sequential extends Module {
   }
 
   @Override
-  public List<Parameter> parameters() {
-    List<Parameter> params = new ArrayList<>();
+  public List<Tensor> parameters() {
+    List<Tensor> params = new ArrayList<>();
 
     for (Module module : modules) params.addAll(module.parameters());
 

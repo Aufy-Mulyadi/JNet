@@ -17,9 +17,11 @@ public class Axes {
    * @param axis axis to verify
    * @throws IndexOutOfBoundsException
    */
-  public static void verifyAxis(String operationName, int rank, int axis) throws IndexOutOfBoundsException {
-    if (axis < 0 || axis >= rank) {
-      throw new IndexOutOfBoundsException(Message.crash("tensor indexing", "Axis out of bounds", operationName, axis + " is out of bounds for a tensor of rank " + rank));
+  public static void verifyAxes(String operationName, int rank, int[] axes) {
+    for (int axis : axes) {
+      if (axis < 0 || axis >= rank) {
+        Message.crash("tensor indexing", "Axis out of bounds", operationName, axis + " is out of bounds for a tensor of rank " + rank);
+      }
     }
   }
 
@@ -29,26 +31,15 @@ public class Axes {
    * @param axes axes to verify
    * @throws IllegalArgumentException
    */
-  public static void verifyUniqueList(String operationName, int[] axes) throws IllegalArgumentException {
+  public static void verifyUniqueList(String operationName, int[] axes) {
     Set<Integer> seen = new HashSet<>();
     
     for (int axis : axes) {
       if (!seen.add(axis)) {
-        throw new IllegalArgumentException(Message.crash("tensor indexing", "Duplicate axis", operationName, "order must be unique, but found two or more instances of " + axis));
+        Message.crash("tensor indexing", "Duplicate axis", operationName, "order must be unique, but found two or more instances of " + axis);
       }
     }
   }
 
-  /**
-   * Throws an exception if the axes is empty.
-   * 
-   * @param axes axes to verify
-   * @throws IllegalArgumentException
-   */
-  public static void verifyNotEmpty(String operationName, int[] axes) throws IllegalArgumentException {
-    if (axes.length == 0) {
-      throw new IllegalArgumentException(Message.crash("tensor indexing", "Empty axes", operationName, "axes cannot be empty"));
-    }
-  }
 
 }

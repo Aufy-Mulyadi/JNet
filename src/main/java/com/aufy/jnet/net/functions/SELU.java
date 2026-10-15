@@ -1,6 +1,6 @@
 package com.aufy.jnet.net.functions;
 
-import com.aufy.jnet.Tensor;
+import com.aufy.jnet.jtensor.Tensor;
 import com.aufy.jnet.net.Module;
 
 public class SELU extends Module {
@@ -19,7 +19,7 @@ public class SELU extends Module {
 
   @Override
   public Tensor forward(Tensor x) {
-    return x.elementwise(
+    return x.ops.elementwise(
       a -> (a > 0)? lambda * a : lambda * alpha * (Math.exp(a) - 1.0), 
       a -> (a > 0)? lambda : lambda * alpha * Math.exp(a)
     );

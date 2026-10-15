@@ -1,13 +1,13 @@
 package com.aufy.jnet.core.backend.arrayops;
 
-import com.aufy.jnet.core.backend.interfaces.BinaryOp;
+import com.aufy.jnet.core.backend.interfaces.atomic.BinaryOp;
 
 /**
  * Manages parallel operations for both integer and double arrays. Both arrays must be the same size; this class will not check nor ensure compatibility
  * 
  * <p>
  * This class provide simple bare-bones mathematical operations for integer and double arrays. All double implementations rely on
- * {@link com.aufy.jnet.core.backend.interfaces.BinaryOp} as a baseline tool.
+ * {@link com.aufy.jnet.core.backend.interfaces.atomic.BinaryOp} as a baseline tool.
  * <p>
  * 
  */
@@ -165,19 +165,6 @@ public class Elementwise {
    */
   public static double[] equal(double[] array1, double[] array2) {
     return BinaryOp.apply(array1, array2, (a, b) -> a == b ? 1 : 0);
-  }
-  
-  /**
-   * Compares two arrays elementwise into a new array of the same size. If the values from each array are equal, the result is 1, otherwise 0.
-   * 
-   * @param array1 the first array.
-   * @param array2 the second array.
-   * @return a new array of the same size.
-   */
-  public static int[] equal(int[] array1, int[] array2) {
-    int[] result = new int[array1.length];
-    for (int i = 0; i < array1.length; i++) result[i] = array1[i] == array2[i] ? 1 : 0;
-    return result;
   }
 
 }

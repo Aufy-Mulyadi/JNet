@@ -1,13 +1,13 @@
 package com.aufy.jnet.core.backend.arrayops;
 
-import com.aufy.jnet.core.backend.interfaces.UnaryOp;
+import com.aufy.jnet.core.backend.interfaces.atomic.UnaryOp;
 
 /**
  * Manages unary operations for both integer and double arrays and transforms each by a scalar.
  * 
  * <p>
  * This class provide simple bare-bones mathematical operations for integer and double arrays. All double implementations rely on
- * {@link com.aufy.jnet.core.backend.interfaces.UnaryOp} as a baseline tool.
+ * {@link com.aufy.jnet.core.backend.interfaces.atomic.UnaryOp} as a baseline tool.
  * <p>
  * 
  */
@@ -179,6 +179,16 @@ public class Uniform {
    */
   public static int[] negate(int[] array) {
     return multiply(array, -1);
+  }
+
+  public static double[] softmax(double[] array) {
+    double max = Reductions.max(array);
+    double[] shifted = Uniform.subtract(array, max);
+    double[] exponentiated = UnaryOp.apply(shifted, a -> Math.exp(a));
+
+    double sum = Reductions.sum(exponentiated);
+
+    return Uniform.divide(exponentiated, sum);
   }
 
 }

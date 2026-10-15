@@ -49,7 +49,7 @@ public class Shaping {
   }
 
   /**
-   * Returns the shape of a tensor with selected axes turned to a singleton.
+   * Returns the shape of a tensor with selected axes turned to singletons.
    * 
    * @param shape Shape of the tensor.
    * @param axes Axes to turn to singletons.
@@ -93,6 +93,22 @@ public class Shaping {
 
       result[i] = Math.max(dimA, dimB);
     }
+    return result;
+  }
+
+  /**
+   * Computes the axes of broadcasting of two tensor shapes relative to the first tensor.
+   *
+   * @param shapeA The shape array of the first tensor.
+   * @param shapeB The shape array of the second tensor.
+   * @return The broadcasted shape array.
+   */
+  public static int[] broadcastedAxes(int[] shapeA, int[] shapeB) {
+    int rank = Math.max(shapeA.length, shapeB.length);
+    int[] result = new int[0];
+
+    for (int i = 0; i < rank; i++) if (shapeA[i] == 1 && shapeB[i] != 1) result = Tools.concat(result, new int[]{i});
+
     return result;
   }
   
@@ -173,5 +189,5 @@ public class Shaping {
 
     return workingShape;
   }
-  
+
 }

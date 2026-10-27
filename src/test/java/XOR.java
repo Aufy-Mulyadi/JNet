@@ -30,7 +30,7 @@ public class XOR {
     );
 
     CategoricalCrossEntropy loss = new CategoricalCrossEntropy(false);
-    SGD optimizer = new SGD(model.parameters(),0.1,0.2);
+    SGD optimizer = new SGD(model.parameters(),0.1,0.0);
 
     long startTime = System.nanoTime();
     for (int epoch = 0; epoch < 2000; epoch++) {
@@ -41,9 +41,9 @@ public class XOR {
       l.backward();
       optimizer.step();
 
-      // System.out.println(epoch + " : " + l);
-      // System.out.println(model.parameters().size());
-      // System.out.println(optimizer.parameters.get(3).core);
+      if(epoch % 100 == 0) {
+        System.out.println("Epoch " + epoch + " | loss: " + l.dump(0));
+      }
     }
 
     System.out.println(model.forward(x));

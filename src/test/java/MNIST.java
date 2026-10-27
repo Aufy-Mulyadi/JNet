@@ -12,7 +12,7 @@ import com.aufy.jnet.net.losses.Loss;
 import com.aufy.jnet.net.losses.SparseCategoricalCrossEntropy;
 import com.aufy.jnet.net.metrics.Accuracy;
 import com.aufy.jnet.net.metrics.Metric;
-import com.aufy.jnet.net.optimizers.SGD;
+import com.aufy.jnet.net.optimizers.ADAM;
 
 class model extends Module {
   public Module activation;
@@ -73,15 +73,16 @@ public class MNIST {
     MNIST.features().inplace.div(255);
     DataLoader loader = new DataLoader(MNIST, 32, true);
     Loss loss = new SparseCategoricalCrossEntropy(true, 0,1,2,3,4,5,6,7,8,9);
-    SGD optimizer = new SGD(model.parameters(),0.001, 0.7);
+    ADAM optimizer = new ADAM(model.parameters(),0.005, 0.9, 0.999);
     Metric metric = new Accuracy();
     
     // network stuff
     Tensor x; Tensor y; Tensor prediction; Tensor l; double accuracy;
-    for (int epoch = 0; epoch < 100; epoch++) {
-      long startTime = System.nanoTime(); 
+    for (int epoch = 0; epoch < 10; epoch++) {
       x = MNIST.features();
       y = MNIST.labels();
+      
+      // find the loss and accuracy from the prediction
       prediction = model.forward(x);
       l = loss.compute(prediction, y);
       accuracy = metric.compute(prediction, y);
@@ -98,13 +99,7 @@ public class MNIST {
         optimizer.zeroGrad();
         l.backward();
         optimizer.step();
-
-        // System.out.println(epoch + " : " + l);
       }
-
-      double durationMs = (System.nanoTime() - startTime) / 1_000_000_000.0;
-      System.out.println("Execution time (Seconds): " + durationMs);
     }
-
   }
 }

@@ -45,11 +45,11 @@ public class ADAM extends Optimizer {
       m[i].inplace.mul(this.beta1).inplace.add(p.grad().inplace.mul(1 - this.beta1)); // betas
       v[i].inplace.mul(this.beta2).inplace.add(p.grad().inplace.pow(2).inplace.mul(1 - this.beta2));
 
-      Tensor mtHat = m[i].div(1 - Math.pow(this.beta1, t)); // bias correction
-      Tensor vtHat = v[i].div(1 - Math.pow(this.beta2, t));
+      Tensor mtHat = m[i].inplace.div(1 - Math.pow(this.beta1, t)); // bias correction
+      Tensor vtHat = v[i].inplace.div(1 - Math.pow(this.beta2, t));
 
       p.inplace.sub(
-        mtHat.mul(this.learningRate)
+        mtHat.inplace.mul(this.learningRate)
         .inplace.div(vtHat.inplace.root(2).inplace.add(1e-8) )
       );
     }

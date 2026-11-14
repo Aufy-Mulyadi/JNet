@@ -20,7 +20,7 @@ class model extends Module {
   public Module layer2;
   public Module layer3;
   public Module layer4;
-  
+
   public model() {
     this.activation = new LeakyReLU(0.1);
     this.layer1 = new Dense(784, 512);
@@ -63,25 +63,30 @@ public class MNIST {
     Module model = new model();
 
     /*
-    60,000 training
-    10,000 test
-    Each row consists of 785 values: [label, pixel1, pixel2, ..., pixel784]
-    - the first value is the label (a number from 0 to 9) 
-    - the remaining 784 values are the pixel values (a number from 0 to 255).
-    */
-    DataContainer MNIST = FileLoader.loadCSV("src\\test\\resources\\mnist_test.csv", new int[]{0}, new int[]{}, new int[]{784});
+     * 60,000 training
+     * 10,000 test
+     * Each row consists of 785 values: [label, pixel1, pixel2, ..., pixel784]
+     * - the first value is the label (a number from 0 to 9)
+     * - the remaining 784 values are the pixel values (a number from 0 to 255).
+     */
+    DataContainer MNIST = FileLoader.loadCSV("src\\test\\resources\\mnist_test.csv", new int[] { 0 }, new int[] { 1 },
+        new int[] { 784 });
     MNIST.features().inplace.div(255);
     DataLoader loader = new DataLoader(MNIST, 32, true);
-    Loss loss = new SparseCategoricalCrossEntropy(true, 0,1,2,3,4,5,6,7,8,9);
-    ADAM optimizer = new ADAM(model.parameters(),0.005, 0.9, 0.999);
+    Loss loss = new SparseCategoricalCrossEntropy(true, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9);
+    ADAM optimizer = new ADAM(model.parameters(), 0.005, 0.9, 0.999);
     Metric metric = new Accuracy();
-    
+
     // network stuff
-    Tensor x; Tensor y; Tensor prediction; Tensor l; double accuracy;
+    Tensor x;
+    Tensor y;
+    Tensor prediction;
+    Tensor l;
+    double accuracy;
     for (int epoch = 0; epoch < 10; epoch++) {
       x = MNIST.features();
       y = MNIST.labels();
-      
+
       // find the loss and accuracy from the prediction
       prediction = model.forward(x);
       l = loss.compute(prediction, y);
@@ -92,10 +97,10 @@ public class MNIST {
       for (DataContainer batch : loader) {
         x = batch.features();
         y = batch.labels();
-        
+
         prediction = model.forward(x);
         l = loss.compute(prediction, y);
-  
+
         optimizer.zeroGrad();
         l.backward();
         optimizer.step();

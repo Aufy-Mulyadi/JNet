@@ -14,11 +14,9 @@ import com.aufy.jnet.jtensor.Tensor;
 
 public class Inplace {
   private final Tensor tensor;
-  private final Internal internal;
   
   public Inplace(Tensor tensor) {
     this.tensor = tensor;
-    this.internal = new Internal(tensor);
   }
 
   @Override

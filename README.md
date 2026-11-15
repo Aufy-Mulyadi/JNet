@@ -18,6 +18,15 @@ JNet is committed to democratizing and opening up machine learning and artificia
 
 ### Getting Started 🚀
 
+#### Requirements
+
+JNet requires a Java 25 LTS JDK to compile and run. Build the project with Maven:
+
+```sh
+mvn clean test-compile
+mvn clean test
+```
+
 JXNet's interface are designed to be intuitive and modular, simmilar to PyNet.
 
 #### JXNet Sequential API

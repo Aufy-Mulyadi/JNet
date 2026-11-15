@@ -16,28 +16,28 @@ public class SuccessCriteria {
 
     // test1();
     // test2();
-    // test3();
-    // test4();
-    // test5();
-    // test6();
-    // test7();
-    // test8();
-    // test9();
+    test3();
+    test4();
+    test5();
+    test6();
+    test7();
+    test8();
+    test9();
     // test10();
 
     // AUTOMATIC DIFFERENTIATION
 
-    // test11();
-    // test12();
-    // test13();
-    // test14();
+    test11();
+    test12();
+    test13();
+    test14();
 
     // DATA PIPELINE
 
-    test15();
-    test16();
-    test17();
-    test18();
+    // test15();
+    // test16();
+    // test17();
+    // test18();
 
     // ADDITIONAL: NEURAL NETWORK COMPONENTS
     testIndividualLayers();

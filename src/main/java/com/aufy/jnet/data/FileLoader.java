@@ -88,7 +88,6 @@ public class FileLoader {
     ArrayList<Tensor> features = new ArrayList<>();
     ArrayList<Tensor> labels = new ArrayList<>();
     int row = 0;
-
     try (BufferedReader br = Files.newBufferedReader(Path.of(filePath))) {
 
       String line;

@@ -6,10 +6,11 @@ import com.aufy.jnet.data.DataLoader;
 import com.aufy.jnet.data.FileLoader;
 import com.aufy.jnet.jtensor.Tensor;
 import com.aufy.jnet.net.Module;
+import com.aufy.jnet.net.functional.Encoder;
 import com.aufy.jnet.net.functions.LeakyReLU;
 import com.aufy.jnet.net.layers.Dense;
+import com.aufy.jnet.net.losses.CategoricalCrossEntropy;
 import com.aufy.jnet.net.losses.Loss;
-import com.aufy.jnet.net.losses.SparseCategoricalCrossEntropy;
 import com.aufy.jnet.net.metrics.Accuracy;
 import com.aufy.jnet.net.metrics.Metric;
 import com.aufy.jnet.net.optimizers.ADAM;
@@ -69,11 +70,16 @@ public class MNIST {
      * - the first value is the label (a number from 0 to 9)
      * - the remaining 784 values are the pixel values (a number from 0 to 255).
      */
-    DataContainer MNIST = FileLoader.loadCSV("src\\test\\resources\\mnist_test.csv", new int[] { 0 }, new int[] { 1 },
+    DataContainer rawMNIST = FileLoader.loadCSV("src/test/resources/mnist_test.csv", new int[] { 0 }, new int[] { 1 },
         new int[] { 784 });
-    MNIST.features().inplace.div(255);
-    DataLoader loader = new DataLoader(MNIST, 32, true);
-    Loss loss = new SparseCategoricalCrossEntropy(true, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9);
+
+    Tensor encodedLabels = Encoder.oneHot(rawMNIST.labels(), new double[] { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9 });
+    rawMNIST.features().inplace.div(255);
+
+    DataContainer encodedMNIST = new DataContainer(rawMNIST.features(), encodedLabels);
+
+    DataLoader loader = new DataLoader(encodedMNIST, 32, true);
+    Loss loss = new CategoricalCrossEntropy(true);
     ADAM optimizer = new ADAM(model.parameters(), 0.005, 0.9, 0.999);
     Metric metric = new Accuracy();
 
@@ -84,13 +90,13 @@ public class MNIST {
     Tensor l;
     double accuracy;
     for (int epoch = 0; epoch < 10; epoch++) {
-      x = MNIST.features();
-      y = MNIST.labels();
+      x = encodedMNIST.features();
+      y = encodedMNIST.labels();
 
       // find the loss and accuracy from the prediction
       prediction = model.forward(x);
       l = loss.compute(prediction, y);
-      accuracy = metric.compute(prediction, y);
+      accuracy = metric.compute(prediction, rawMNIST.labels().squeeze(1));
 
       System.out.println("Epoch " + epoch + " | accuracy: " + accuracy + " | loss: " + l.dump(0));
 

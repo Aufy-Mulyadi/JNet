@@ -39,28 +39,37 @@ public class Tensor {
 
   protected int[] shape;
   protected int rank;
-  protected int size; 
+  protected int size;
 
   public static boolean verbose = false;
   public boolean requiresGrad;
 
   public Tensor(double[] data, int... shape) {
-    if (data == null) Message.crash("initialization", "Null data", null, "data cannot be null");
-    if (data.length == 0) Message.crash("initialization", "Empty data", null, "data cannot be empty");
-    if (shape == null) Message.crash("initialization", "Null shape", null, "shape cannot be null");
-    if (shape.length == 0) Message.crash("initialization", "Empty shape", null, "shape cannot be empty");
-    if (Reductions.prod(shape) != data.length) Message.crash("initialization", "Bad shape", null, "shape " + Arrays.toString(shape) + " does not match data size " + data.length);
-
-    this(new CoreTensor(data, shape));
+    this(createCoreTensor(data, shape));
   }
-  
+
+  private static CoreTensor createCoreTensor(double[] data, int[] shape) {
+    if (data == null)
+      Message.crash("initialization", "Null data", null, "data cannot be null");
+    if (data.length == 0)
+      Message.crash("initialization", "Empty data", null, "data cannot be empty");
+    if (shape == null)
+      Message.crash("initialization", "Null shape", null, "shape cannot be null");
+    if (shape.length == 0)
+      Message.crash("initialization", "Empty shape", null, "shape cannot be empty");
+    if (Reductions.prod(shape) != data.length)
+      Message.crash("initialization", "Bad shape", null,
+          "shape " + Arrays.toString(shape) + " does not match data size " + data.length);
+    return new CoreTensor(data, shape);
+  }
+
   protected Tensor(CoreTensor tensor) {
     this.shape = tensor.shape;
     this.rank = tensor.rank;
     this.size = tensor.size;
     this.requiresGrad = tensor.requiresGrad;
     this.core = tensor;
-    
+
     this.reduce = new Reduce(this);
     this.custom = new Custom(this);
     this.ops = new Ops(this);
@@ -74,7 +83,7 @@ public class Tensor {
     this.ops_ = new com.aufy.jnet.jtensor.inplace.Ops(this);
     this.util_ = new com.aufy.jnet.jtensor.inplace.Util(this);
   }
-  
+
   protected Tensor(RawTensor tensor) {
     this.shape = tensor.shape;
     this.rank = tensor.rank;
@@ -138,7 +147,7 @@ public class Tensor {
    * Dumps a specific element from a tensor's raw heap.
    * 
    * @param tensor the tensor to dump from.
-   * @param index the index of the element to dump.
+   * @param index  the index of the element to dump.
    * @return the element at the specified index.
    */
   public double dump(int index) {
@@ -155,22 +164,33 @@ public class Tensor {
     Data.verifyData(tensor.core.dump());
     return tensor.core.dump().clone();
   }
-  
+
   /**
    * Dumps a specific element from a tensor's raw heap.
    * 
    * @param tensor the tensor to dump from.
-   * @param index the index of the element to dump.
+   * @param index  the index of the element to dump.
    * @return the element at the specified index.
    */
   public static double dump(Tensor tensor, int index) {
     return dump(tensor)[index];
   }
 
-  public int[] getShape() {return this.shape.clone();}
-  public int getShape(int index) {return this.shape[index];}
-  public int getRank() {return this.rank;}
-  public int getSize() {return this.size;}
+  public int[] getShape() {
+    return this.shape.clone();
+  }
+
+  public int getShape(int index) {
+    return this.shape[index];
+  }
+
+  public int getRank() {
+    return this.rank;
+  }
+
+  public int getSize() {
+    return this.size;
+  }
 
   // ###########################################################################################################
   // AUTOGRAD //
@@ -191,7 +211,8 @@ public class Tensor {
    * @param tensor the tensor to run the backward pass from.
    */
   public static void backward(Tensor tensor) {
-    if (!tensor.requiresGrad) Message.crash("autograd", "cannot compute gradients", "backward", "tensor is not configured to track gradients");
+    if (!tensor.requiresGrad)
+      Message.crash("autograd", "cannot compute gradients", "backward", "tensor is not configured to track gradients");
     tensor.core.backward();
   }
 
@@ -211,8 +232,10 @@ public class Tensor {
    * @return a new tensor containing the tracked gradient values.
    */
   public static Tensor grad(Tensor tensor) {
-    if (!tensor.requiresGrad) Message.crash("autograd", "cannot compute gradients", "backward", "tensor is not configured to track gradients");
-    if (tensor.core.grad == null) Message.crash("autograd", "cannot compute gradients", "backward", "tensor is not configured to track gradients");
+    if (!tensor.requiresGrad)
+      Message.crash("autograd", "cannot compute gradients", "backward", "tensor is not configured to track gradients");
+    if (tensor.core.grad == null)
+      Message.crash("autograd", "cannot compute gradients", "backward", "tensor is not configured to track gradients");
 
     return new Tensor(tensor.core.grad);
   }
@@ -230,8 +253,10 @@ public class Tensor {
    * @param tensor the target core tensor structure to modify
    */
   public static void noGrad(Tensor tensor) {
-    if (tensor.core.grad == null) Message.crash("autograd", "null gradients", "backward", "tensor does not have gradients");
-    if (tensor.core.grad == null) Message.crash("autograd", "cannot clear gradients", "backward", "tensor is not configured to track gradients");
+    if (tensor.core.grad == null)
+      Message.crash("autograd", "null gradients", "backward", "tensor does not have gradients");
+    if (tensor.core.grad == null)
+      Message.crash("autograd", "cannot clear gradients", "backward", "tensor is not configured to track gradients");
     tensor.noGrad();
   }
 
@@ -295,45 +320,53 @@ public class Tensor {
     tensor.core.requiresGrad = true;
     return tensor;
   }
-  
+
   // ###########################################################################################################
   // INTERNAL CALLS //
   // ###########################################################################################################
 
   /**
-   * Initializes a new UninitializedTensor with the specified shape. To get a proper Tensor output, call the various
+   * Initializes a new UninitializedTensor with the specified shape. To get a
+   * proper Tensor output, call the various
    * generating functions inside the UninitializedTensor.
    * 
    * @param shape the desired dimensions for the new tensor.
-   * @return a new UninitializedTensor (if plainly called) or a new Tensor (if called initializing methods).
+   * @return a new UninitializedTensor (if plainly called) or a new Tensor (if
+   *         called initializing methods).
    */
   public static Init init(int... shape) {
     return new Init(shape);
   }
 
   /**
-   * Initializes a new UninitializedTensor with the specified shape of another tensor. To get a proper Tensor output, call the various
+   * Initializes a new UninitializedTensor with the specified shape of another
+   * tensor. To get a proper Tensor output, call the various
    * generating functions inside the UninitializedTensor.
    * 
-   * @param tensor the desired dimensions for the new tensor (matched to the shape).
-   * @return a new UninitializedTensor (if plainly called) or a new Tensor (if called initializing methods).
+   * @param tensor the desired dimensions for the new tensor (matched to the
+   *               shape).
+   * @return a new UninitializedTensor (if plainly called) or a new Tensor (if
+   *         called initializing methods).
    */
   public static Init init(Tensor tensor) {
     return new Init(tensor);
   }
 
   /**
-   * Initializes a new UninitializedTensor with the same shape as this tensor. To get a proper Tensor output, call the various
+   * Initializes a new UninitializedTensor with the same shape as this tensor. To
+   * get a proper Tensor output, call the various
    * generating functions inside the UninitializedTensor.
    * 
-   * @return a new UninitializedTensor (if plainly called) or a new Tensor (if called initializing methods).
+   * @return a new UninitializedTensor (if plainly called) or a new Tensor (if
+   *         called initializing methods).
    */
   public Init init() {
     return new Init(this.shape);
   }
 
   /**
-   * Creates a new Statistics object for this tensor. To get a proper Tensor output, call the various
+   * Creates a new Statistics object for this tensor. To get a proper Tensor
+   * output, call the various
    * generating functions inside the reference tensor.
    * 
    * @param axes the dimensions to reduce.
@@ -344,7 +377,8 @@ public class Tensor {
   }
 
   /**
-   * Creates a new Statistics object for this tensor along all axes. To get a proper Tensor output, call the various
+   * Creates a new Statistics object for this tensor along all axes. To get a
+   * proper Tensor output, call the various
    * generating functions inside the reference tensor.
    * 
    * @return a reference tensor to this tensor with the specified axes reduced.
@@ -352,7 +386,7 @@ public class Tensor {
   public Stats stats() {
     return new Stats(this, Tools.arrange(this.rank));
   }
-  
+
   // ###########################################################################################################
   // SPECIFIC OPERATIONS //
   // ###########################################################################################################
@@ -363,8 +397,8 @@ public class Tensor {
    * Contracts this tensor with another tensor along the specified axes.
    *
    * @param tensorB the tensor to contract with.
-   * @param axesA the axes of contraction for this tensor.
-   * @param axesB the axes of contraction for the second tensor.
+   * @param axesA   the axes of contraction for this tensor.
+   * @param axesB   the axes of contraction for the second tensor.
    * @return a new tensor resulting from the contraction.
    */
   public Tensor contract(Tensor tensorB, int[] axesA, int[] axesB) {
@@ -372,16 +406,20 @@ public class Tensor {
   }
 
   /**
-   * Contracts two specified tensors along their respective axes locations. Tensor contraction is a generalization of matrix multiplication; resulting tensors are automatically squeezed to remove single-dimensional entries.
+   * Contracts two specified tensors along their respective axes locations. Tensor
+   * contraction is a generalization of matrix multiplication; resulting tensors
+   * are automatically squeezed to remove single-dimensional entries.
    *
    * @param tensorA the first tensor.
    * @param tensorB the second tensor.
-   * @param axesA the axes of contraction for tensorA.
-   * @param axesB the axes of contraction for tensorB.
+   * @param axesA   the axes of contraction for tensorA.
+   * @param axesB   the axes of contraction for tensorB.
    * @return a new tensor resulting from the contraction.
    */
   public static Tensor contract(Tensor tensorA, Tensor tensorB, int[] axesA, int[] axesB) {
-    if (tensorA == null || tensorB == null) Message.crash("internal error", "null tensors in tensor contraction", "tensor contraction", "tensors cannot be null");
+    if (tensorA == null || tensorB == null)
+      Message.crash("internal error", "null tensors in tensor contraction", "tensor contraction",
+          "tensors cannot be null");
     Axes.verifyAxes("tensor contraction", tensorA.rank, axesA);
     Axes.verifyAxes("tensor contraction", tensorB.rank, axesB);
 
@@ -389,7 +427,8 @@ public class Tensor {
   }
 
   /**
-   * Calculates the outer product of this tensor with another tensor to expand dimensions.
+   * Calculates the outer product of this tensor with another tensor to expand
+   * dimensions.
    *
    * @param tensorB the tensor to contract with.
    * @return a new tensor resulting from the product.
@@ -399,7 +438,8 @@ public class Tensor {
   }
 
   /**
-   * Calculates the outer product of this tensor with another tensor to expand dimensions.
+   * Calculates the outer product of this tensor with another tensor to expand
+   * dimensions.
    *
    * @param tensorA the first tensor.
    * @param tensorB the second tensor.
@@ -408,7 +448,7 @@ public class Tensor {
   public static Tensor outer(Tensor tensorA, Tensor tensorB) {
     return new Tensor(BinaryOps.contract(tensorA.core, tensorB.core, new int[0], new int[0]));
   }
-  
+
   /**
    * Adds another tensor to this tensor elementwise.
    *
@@ -514,7 +554,8 @@ public class Tensor {
    * @return a new tensor containing the elementwise power results.
    */
   public static Tensor pow(Tensor tensorA, Tensor tensorB) {
-    return Ops.elementwise(tensorA, tensorB, (x, y) -> Math.pow(x, y), (x, y) -> y * Math.pow(x, y - 1), (x, y) -> Math.pow(x, y) * Math.log(x));
+    return Ops.elementwise(tensorA, tensorB, (x, y) -> Math.pow(x, y), (x, y) -> y * Math.pow(x, y - 1),
+        (x, y) -> Math.pow(x, y) * Math.log(x));
   }
 
   /**
@@ -537,8 +578,8 @@ public class Tensor {
   public static Tensor matmul(Tensor tensorA, Tensor tensorB) {
     Operation.verifyMatMul(tensorA.shape, tensorB.shape);
 
-    int[] axesA = {tensorA.rank - 1};
-    int[] axesB = {(tensorB.rank == 1) ? 0 : tensorB.rank - 2 };
+    int[] axesA = { tensorA.rank - 1 };
+    int[] axesB = { (tensorB.rank == 1) ? 0 : tensorB.rank - 2 };
 
     return contract(tensorA, tensorB, axesA, axesB);
   }
@@ -546,8 +587,10 @@ public class Tensor {
   // SHAPE OPERATIONS ---------------------------------
 
   /**
-   * Broadcasts this tensor into a new target shape. Broadcasting a tensor is multiplying values of a tensor across
-   * a new dimension to match the target shape layout. This is usually done implicitly and internally. This tensor must equal in rank
+   * Broadcasts this tensor into a new target shape. Broadcasting a tensor is
+   * multiplying values of a tensor across
+   * a new dimension to match the target shape layout. This is usually done
+   * implicitly and internally. This tensor must equal in rank
    * to the desired shape.
    *
    * @param shape the desired dimensions for the new tensor.
@@ -558,8 +601,10 @@ public class Tensor {
   }
 
   /**
-   * Broadcasts a tensor into a new target shape. Broadcasting a tensor is multiplying values of a tensor across
-   * a new dimension to match the target shape layout. This is usually done implicitly and internally.
+   * Broadcasts a tensor into a new target shape. Broadcasting a tensor is
+   * multiplying values of a tensor across
+   * a new dimension to match the target shape layout. This is usually done
+   * implicitly and internally.
    *
    * @param Tenor the tensor. Must equal in rank to the target shape.
    * @param shape the desired dimensions for the new tensor.
@@ -583,7 +628,7 @@ public class Tensor {
    * Reshapes a specified tensor into a new target shape layout.
    *
    * @param tensor the tensor to reshape.
-   * @param shape the desired dimensions for the new tensor.
+   * @param shape  the desired dimensions for the new tensor.
    * @return a new tensor matched to the target shape layout.
    */
   public static Tensor reshape(Tensor tensor, int... shape) {
@@ -603,7 +648,7 @@ public class Tensor {
   /**
    * Permutes the axes order of a specified tensor according to the target layout.
    *
-   * @param tensor the tensor to permute.
+   * @param tensor   the tensor to permute.
    * @param newOrder the target ordering index map for the dimensions.
    * @return a new tensor with reordered axes.
    */
@@ -614,7 +659,8 @@ public class Tensor {
   }
 
   /**
-   * Squeezes single-dimensional configurations (singletons) out of this tensor's dimensions at the specified axes.
+   * Squeezes single-dimensional configurations (singletons) out of this tensor's
+   * dimensions at the specified axes.
    *
    * @param axes the location of singleton dimensions to remove.
    * @return a new tensor lacking singleton dimensions.
@@ -624,14 +670,17 @@ public class Tensor {
   }
 
   /**
-   * Squeezes single-dimensional configurations (singletons) out of this tensor's dimensions at the specified axes.
+   * Squeezes single-dimensional configurations (singletons) out of this tensor's
+   * dimensions at the specified axes.
    *
    * @param tensor the target tensor to squeeze.
-   * @param axes the location of singleton dimensions to remove.
+   * @param axes   the location of singleton dimensions to remove.
    * @return a new tensor lacking singleton dimensions.
    */
   public static Tensor squeeze(Tensor tensor, int... axes) {
-    if (Reductions.prod(Tools.gather(tensor.shape, axes)) != 1) Message.crash("shaping", "cannot squeeze non-singleton dimension(s)", "selective squeezing", "tried to squeeze a non-singleton dimension (dimensions with size 1)");
+    if (Reductions.prod(Tools.gather(tensor.shape, axes)) != 1)
+      Message.crash("shaping", "cannot squeeze non-singleton dimension(s)", "selective squeezing",
+          "tried to squeeze a non-singleton dimension");
     Axes.verifyAxes("squeezing", tensor.rank, axes);
 
     return new Tensor(ShapeOps.squeeze(tensor.core, axes));
@@ -658,7 +707,10 @@ public class Tensor {
   }
 
   /**
-   * Unsqueezes a single dimension into a specified tensor's structural layout. The tensor will be expanded by iterating over the shape, and if an axis of unsqueezing is detected, will pad the shape with a singleton dimension at that location.
+   * Unsqueezes a single dimension into a specified tensor's structural layout.
+   * The tensor will be expanded by iterating over the shape, and if an axis of
+   * unsqueezing is detected, will pad the shape with a singleton dimension at
+   * that location.
    *
    * @param axes the location of the new dimensions to expand.
    * @return a new tensor expanded by an isolated dimension.
@@ -668,10 +720,13 @@ public class Tensor {
   }
 
   /**
-   * Unsqueezes a single dimension into a specified tensor's structural layout. The tensor will be expanded by iterating over the shape, and if an axis of unsqueezing is detected, will pad the shape with a singleton dimension at that location.
+   * Unsqueezes a single dimension into a specified tensor's structural layout.
+   * The tensor will be expanded by iterating over the shape, and if an axis of
+   * unsqueezing is detected, will pad the shape with a singleton dimension at
+   * that location.
    *
    * @param tensor the target tensor to expand.
-   * @param axes the location of the new dimensions to expand.
+   * @param axes   the location of the new dimensions to expand.
    * @return a new tensor expanded by an isolated dimension.
    */
   public static Tensor unsqueeze(Tensor tensor, int... axes) {
@@ -683,7 +738,7 @@ public class Tensor {
   /**
    * Extracts a specific dimensional slice from this tensor layout.
    *
-   * @param axis the dimension line targeted for slicing.
+   * @param axis  the dimension line targeted for slicing.
    * @param index the exact index position inside the targeted axis slice.
    * @return a new tensor representing the extracted slice.
    */
@@ -695,21 +750,25 @@ public class Tensor {
    * Extracts a specific dimensional slice from a specified tensor structure.
    *
    * @param tensor the tensor to slice from.
-   * @param axis the dimension line targeted for slicing.
-   * @param index the exact index position inside the targeted axis slice.
-   * @return a new tensor representing the extracted slice with removed dimension set to singletons.
+   * @param axis   the dimension line targeted for slicing.
+   * @param index  the exact index position inside the targeted axis slice.
+   * @return a new tensor representing the extracted slice with removed dimension
+   *         set to singletons.
    */
   public static Tensor slice(Tensor tensor, int axis, int index) {
-    if (axis < 0 || axis >= tensor.rank) Message.crash("tensor indexing", "Axis out of bounds", "slicing", axis + " is out of bounds for a tensor of rank " + tensor.rank);
-    if (index < 0 || index >= tensor.shape[axis]) Message.crash("tensor indexing", "Index out of bounds", "slicing", index + " is out of bounds for axis " + axis);
-      
+    if (axis < 0 || axis >= tensor.rank)
+      Message.crash("tensor indexing", "Axis out of bounds", "slicing",
+          axis + " is out of bounds for a tensor of rank " + tensor.rank);
+    if (index < 0 || index >= tensor.shape[axis])
+      Message.crash("tensor indexing", "Index out of bounds", "slicing", index + " is out of bounds for axis " + axis);
+
     return new Tensor(ShapeOps.slice(tensor.core, axis, index));
   }
 
   /**
    * Extracts specific dimensional slices from this tensor.
    *
-   * @param axis the dimension line targeted for slicing.
+   * @param axis     the dimension line targeted for slicing.
    * @param indecies the exact positions inside the targeted axis slice.
    * @return a new tensor representing the extracted slice.
    */
@@ -720,44 +779,54 @@ public class Tensor {
   /**
    * Extracts specific dimensional slices from a tensor.
    *
-   * @param tensor the tensor to gather from.
-   * @param axis the dimension line targeted for slicing.
+   * @param tensor   the tensor to gather from.
+   * @param axis     the dimension line targeted for slicing.
    * @param indecies the exact positions inside the targeted axis slice.
    * @return a new tensor representing the extracted slice.
    */
   public static Tensor gather(Tensor tensor, int axis, int... indecies) {
-    if (axis < 0 || axis >= tensor.rank) Message.crash("tensor indexing", "Axis out of bounds", "gather", axis + " is out of bounds for a tensor of rank " + tensor.rank);
-    if (indecies.length == 0) Message.crash("tensor indexing", "Empty index", "gather", "tried to gather an empty index");
+    if (axis < 0 || axis >= tensor.rank)
+      Message.crash("tensor indexing", "Axis out of bounds", "gather",
+          axis + " is out of bounds for a tensor of rank " + tensor.rank);
+    if (indecies.length == 0)
+      Message.crash("tensor indexing", "Empty index", "gather", "tried to gather an empty index");
 
     Tensor[] tensors = new Tensor[indecies.length];
     for (int i = 0; i < tensors.length; i++) {
-      if (indecies[i] < 0 || indecies[i] >= tensor.shape[axis]) Message.crash("tensor indexing", "Index out of bounds", "gather", indecies[i] + " is out of bounds for axis " + axis);
+      if (indecies[i] < 0 || indecies[i] >= tensor.shape[axis])
+        Message.crash("tensor indexing", "Index out of bounds", "gather",
+            indecies[i] + " is out of bounds for axis " + axis);
       tensors[i] = tensor.slice(axis, indecies[i]);
     }
-    
+
     return concat(axis, tensors);
   }
 
   /**
    * Stacks an array of source tensors uniformly together along a targeted axis.
    *
-   * @param axis the axis line sequence configuration where tensors stack together.
+   * @param axis    the axis line sequence configuration where tensors stack
+   *                together.
    * @param tensors the target group of tensors being joined.
    * @return a new stacked tensor representation.
    */
   public static Tensor stack(int axis, Tensor... tensors) {
     CoreTensor[] coreTensors = new CoreTensor[tensors.length];
     int[][] shapes = new int[tensors.length][];
-    
+
     for (int i = 0; i < tensors.length; i++) {
-      if (tensors[i].rank != tensors[0].rank) Message.crash("geometric", "ragged stacking", "stacking", "tried to stack tensors of varying ranks");
-      if (tensors[i] == null) Message.crash("internal", "null tensor", "stacking", "tried to concatenate a null tensor");
+      if (tensors[i].rank != tensors[0].rank)
+        Message.crash("geometric", "ragged stacking", "stacking", "tried to stack tensors of varying ranks");
+      if (tensors[i] == null)
+        Message.crash("internal", "null tensor", "stacking", "tried to concatenate a null tensor");
       coreTensors[i] = tensors[i].core;
       shapes[i] = tensors[i].getShape();
     }
-  
+
     Operation.verifyStack(shapes);
-    if (axis < 0 || axis > tensors[0].rank - 1) Message.crash("shaping", "axis out of bounds", "stacking", "cannot stack tensors along axis " + axis + " because it is out of bounds");
+    if (axis < 0 || axis >= tensors[0].rank)
+      Message.crash("shaping", "axis out of bounds", "stacking",
+          "cannot stack tensors along axis " + axis + " because it is out of bounds");
 
     return new Tensor(ShapeOps.stack(axis, coreTensors));
   }
@@ -766,23 +835,28 @@ public class Tensor {
    * Concatenates an array of source tensors together sequentially along a
    * targeted axis.
    *
-   * @param axis the operational axis sequence where arrays join up.
+   * @param axis    the operational axis sequence where arrays join up.
    * @param tensors the target group of tensors being concatenated.
    * @return a new unified continuous structural tensor.
    */
   public static Tensor concat(int axis, Tensor... tensors) {
     CoreTensor[] coreTensors = new CoreTensor[tensors.length];
     int[][] shapes = new int[tensors.length][];
-    
+
     for (int i = 0; i < tensors.length; i++) {
-      if (tensors[i].rank != tensors[0].rank) Message.crash("geometric", "ragged concatenation", "concatenation", "tried to concatenating tensors of varying ranks");
-      if (tensors[i] == null) Message.crash("internal", "null tensor", "concatenation", "tried to concatenate a null tensor");
+      if (tensors[i].rank != tensors[0].rank)
+        Message.crash("geometric", "ragged concatenation", "concatenation",
+            "tried to concatenating tensors of varying ranks");
+      if (tensors[i] == null)
+        Message.crash("internal", "null tensor", "concatenation", "tried to concatenate a null tensor");
       coreTensors[i] = tensors[i].core;
       shapes[i] = tensors[i].getShape();
     }
 
     Operation.verifyConcat(axis, shapes);
-    if (axis < 0 || axis > tensors[0].rank - 1) Message.crash("shaping", "axis out of bounds", "concatenation", "cannot concatenate tensors along axis " + axis + " because it is out of bounds");
+    if (axis < 0 || axis > tensors[0].rank - 1)
+      Message.crash("shaping", "axis out of bounds", "concatenation",
+          "cannot concatenate tensors along axis " + axis + " because it is out of bounds");
 
     return new Tensor(ShapeOps.concat(axis, coreTensors));
   }
@@ -816,13 +890,15 @@ public class Tensor {
   }
 
   /**
-   * Transposes the dimensional axes of a tensor. In this implementation, 
+   * Transposes the dimensional axes of a tensor. In this implementation,
    *
    * @param tensor the tensor to transpose.
    * @return a new transposed tensor.
    */
   public static Tensor transpose(Tensor tensor) {
-    if (tensor.rank < 2) Message.crash("mathematical", "transposing a vector or scalar", "tensor transpose", "the transpose of a vector or scalar is undefined");
+    if (tensor.rank < 2)
+      Message.crash("mathematical", "transposing a vector or scalar", "tensor transpose",
+          "the transpose of a vector or scalar is undefined");
 
     int[] transposed = Tools.arrange(tensor.rank);
 
@@ -835,7 +911,7 @@ public class Tensor {
 
     return out;
   }
-  
+
   // UNARY OPERATIONS ---------------------------------
 
   /**
@@ -919,7 +995,8 @@ public class Tensor {
    * @return a new scaled tensor.
    */
   public static Tensor div(Tensor tensor, double scalar) {
-    if (scalar == 0.0) Message.crash("mathematical", "division by zero", "scalar division", "tried to divide tensor data by zero");
+    if (scalar == 0.0)
+      Message.crash("mathematical", "division by zero", "scalar division", "tried to divide tensor data by zero");
     return Ops.elementwise(tensor, (a) -> a / scalar, (a) -> scalar);
   }
 
@@ -945,7 +1022,8 @@ public class Tensor {
   }
 
   /**
-   * Exponentiates every element in this tensor to a scalar power (scalar^element).
+   * Exponentiates every element in this tensor to a scalar power
+   * (scalar^element).
    *
    * @param base the base value.
    * @return a new exponentiated tensor.
@@ -955,14 +1033,17 @@ public class Tensor {
   }
 
   /**
-   * Exponentiates every element in this tensor to a scalar power (scalar^element).
+   * Exponentiates every element in this tensor to a scalar power
+   * (scalar^element).
    *
    * @param tensor the exponent tensor.
-   * @param base the base value.
+   * @param base   the base value.
    * @return a new exponentiated tensor.
    */
   public static Tensor exp(Tensor tensor, double base) {
-    if (base < 0) Message.crash("tensor argument", "Illegal parameter", "exponentiation" , "parameter must be at least 0 but got " + base);
+    if (base < 0)
+      Message.crash("tensor argument", "Illegal parameter", "exponentiation",
+          "parameter must be at least 0 but got " + base);
     return Ops.elementwise(tensor, (a) -> Math.pow(base, a), (a) -> Math.pow(base, a) * Math.log(base));
   }
 
@@ -998,13 +1079,13 @@ public class Tensor {
    * Exponentiates every element in this tensor using a specified base.
    *
    * @param tensor the base tensor.
-   * @param base the base of the logarithm.
+   * @param base   the base of the logarithm.
    * @return a new exponentiated tensor.
    */
   public static Tensor log(Tensor tensor, double base) {
     Data.aboveValue(0, tensor.core.core.data, "log");
     Argument.aboveValue(0, base, "log");
-    return Ops.elementwise(tensor, (a) -> Math.log(a)/Math.log(base), (a) -> 1.0 / (a * Math.log(base)));
+    return Ops.elementwise(tensor, (a) -> Math.log(a) / Math.log(base), (a) -> 1.0 / (a * Math.log(base)));
   }
 
   /**
@@ -1020,7 +1101,7 @@ public class Tensor {
    * Exponentiates every element in this tensor using a specified base.
    *
    * @param tensor the base tensor.
-   * @param base the base of the logarithm.
+   * @param base   the base of the logarithm.
    * @return a new exponentiated tensor.
    */
   public static Tensor ln(Tensor tensor) {
@@ -1032,7 +1113,7 @@ public class Tensor {
    * Takes the square root of every element in this tensor.
    *
    * @param tensor the base tensor.
-   * @param root the root value.
+   * @param root   the root value.
    * @return a new exponentiated tensor.
    */
   public Tensor root() {
@@ -1043,7 +1124,7 @@ public class Tensor {
    * Takes the square root of every element in this tensor.
    *
    * @param tensor the base tensor.
-   * @param root the root value.
+   * @param root   the root value.
    * @return a new exponentiated tensor.
    */
   public static Tensor root(Tensor tensor) {
@@ -1055,7 +1136,7 @@ public class Tensor {
    * Takes the root of every element in this tensor.
    *
    * @param tensor the base tensor.
-   * @param root the root value.
+   * @param root   the root value.
    * @return a new exponentiated tensor.
    */
   public Tensor root(double root) {
@@ -1066,7 +1147,7 @@ public class Tensor {
    * Takes the root of every element in this tensor.
    *
    * @param tensor the base tensor.
-   * @param root the root value.
+   * @param root   the root value.
    * @return a new exponentiated tensor.
    */
   public static Tensor root(Tensor tensor, double root) {
